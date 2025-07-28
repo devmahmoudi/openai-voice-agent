@@ -1,10 +1,12 @@
 import React, { useEffect, useRef } from "react";
 
-const MicVisualizer = ({ icon = null }) => {
+const MicVisualizer = ({ icon = null, analyser }) => {
   const canvasRef = useRef(null);
   const iconRef = useRef(null);
 
   useEffect(() => {
+    if (!analyser) return;
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     canvas.width = 300;
@@ -13,16 +15,7 @@ const MicVisualizer = ({ icon = null }) => {
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
 
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 64;
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-    navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-      const source = audioCtx.createMediaStreamSource(stream);
-      source.connect(analyser);
-      draw();
-    });
 
     const draw = () => {
       requestAnimationFrame(draw);
@@ -62,7 +55,9 @@ const MicVisualizer = ({ icon = null }) => {
         ctx.fillRect(centerX - 10, centerY + 10, 20, 2);
       }
     };
-  }, [icon]);
+
+    draw();
+  }, [icon, analyser]);
 
   return (
     <div
