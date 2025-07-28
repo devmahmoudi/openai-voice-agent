@@ -1,59 +1,35 @@
 import "./App.css";
 import MicVisualizer from "./components/MicVisualizer";
 import { Mic } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
+import AudioContext from "./contexts/AudioContext";
 
 function App() {
-  const audioCtxRef = useRef(null);
-  const analyserRef = useRef(null);
-  const streamRef = useRef(null);
-  const [isMicReady, setIsMicReady] = useState(false);
+  const audioContext = useContext(AudioContext);
+
+  const [analyser, setAnalyser] = useState(null);
 
   useEffect(() => {
-    const setupMicrophone = async () => {
-      try {
-        // Create audio context
-        audioCtxRef.current = new (window.AudioContext ||
-          window.webkitAudioContext)();
+    const setupAnalyzer = async () => {
+      const analyser = await audioContext.getAudioAnalyser();
 
-        // Create analyser
-        analyserRef.current = audioCtxRef.current.createAnalyser();
-        analyserRef.current.fftSize = 64;
+      const source = await audioContext.getAudioSource();
 
-        // Get microphone stream
-        streamRef.current = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
+      source.connect(analyser);
 
-        // Connect stream to analyser
-        const source = audioCtxRef.current.createMediaStreamSource(
-          streamRef.current
-        );
-        source.connect(analyserRef.current);
-
-        setIsMicReady(true);
-      } catch (error) {
-        console.error("Error accessing microphone:", error);
-      }
+      setAnalyser(analyser);
     };
 
-    setupMicrophone();
-
-    // Cleanup function
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-      if (audioCtxRef.current) {
-        audioCtxRef.current.close();
-      }
-    };
+    setupAnalyzer();
   }, []);
 
   return (
     <>
-      {isMicReady && (
-        <MicVisualizer icon={<Mic />} analyser={analyserRef.current} />
+      {analyser && (
+        <MicVisualizer
+          icon={<Mic />}
+          analyser={analyser}
+        />
       )}
     </>
   );
