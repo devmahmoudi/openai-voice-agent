@@ -36,6 +36,8 @@ export const AudioProvider = ({ children }) => {
       return context.createMediaStreamSource(stream);
     } catch (error) {
       console.error("Error accessing microphone:", error);
+
+      return null
     }
   };
 

@@ -15,7 +15,7 @@ function App() {
 
       const source = await audioContext.getAudioSource();
 
-      source.connect(analyser);
+      if (source) source.connect(analyser);
 
       setAnalyser(analyser);
     };
@@ -24,14 +24,7 @@ function App() {
   }, []);
 
   return (
-    <>
-      {analyser && (
-        <MicVisualizer
-          icon={<Mic />}
-          analyser={analyser}
-        />
-      )}
-    </>
+    <>{analyser && <MicVisualizer icon={<Mic />} analyser={analyser} />}</>
   );
 }
 
