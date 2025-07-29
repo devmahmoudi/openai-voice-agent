@@ -9,17 +9,9 @@ const Recorder = () => {
 
   const [analyser, setAnalyser] = useState(null);
 
-  const [source, setSource] = useState(null);
-
   const [recorder, setRecorder] = useState(null);
 
   const startRecording = async () => {
-    const voiceSource = await audioContext.getAudioSource();
-
-    setSource(voiceSource);
-
-    voiceSource.connect(analyser);
-
     const recorder = new MediaRecorder(await audioContext.getAudioStream());
 
     recorder.start(250);
@@ -29,8 +21,19 @@ const Recorder = () => {
     return recorder;
   };
 
-  const stopRecording = () => {};
+  const stopRecording = () => {
+    if (!recorder) return;
 
+    recorder.ondataavailable = null;
+
+    if (recorder.state !== "inactive") {
+      recorder.stop();
+    }
+
+    setRecorder(null);
+  };
+
+  // RECORDING STATE
   const [state, dispatch] = useReducer(
     (state, action) => {
       switch (action) {
@@ -55,6 +58,7 @@ const Recorder = () => {
     }
   );
 
+  // HANDLE RECORDER DATA
   useEffect(() => {
     if (recorder && state.isRecording) {
       recorder.ondataavailable = (e) => {
@@ -63,6 +67,30 @@ const Recorder = () => {
     }
   }, [recorder]);
 
+  // CONNECTION SWITCHER BETWEEN SOURCE AND ANALYSER
+  useEffect(() => {
+    if (state.isRecording) {
+      connectSourceToAnalyser();
+    } else {
+      disconnectSourceToAnalyser();
+    }
+  }, [state.isRecording]);
+
+  // CONNECT AUDIO SOURCE TO ANALYSER
+  const connectSourceToAnalyser = async () => {
+    const voiceSource = await audioContext.getAudioSource();
+
+    voiceSource.connect(analyser);
+  };
+
+  // DISCONNECT AUDIO SOURCE FROM ANALYSER
+  const disconnectSourceToAnalyser = async () => {
+    const voiceSource = await audioContext.getAudioSource();
+
+    setAnalyser(audioContext.getAudioAnalyser());
+  };
+
+  // SET INIT VALUE FOR ANALYSER IN THE COMPONENT MOUNT
   useEffect(() => {
     const setupAnalyzer = async () => {
       setAnalyser(await audioContext.getAudioAnalyser());
