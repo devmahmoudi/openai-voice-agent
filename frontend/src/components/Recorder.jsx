@@ -1,4 +1,4 @@
-import { useReducer } from "react";
+import { useReducer, useRef } from "react";
 import MicVisualizer from "./MicVisualizer";
 import { Mic } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
@@ -11,12 +11,26 @@ const Recorder = () => {
 
   const [recorder, setRecorder] = useState(null);
 
+  const socketRef = useRef();
+
   const startRecording = async () => {
+    // Open WebSocket connection
+    socketRef.current = new WebSocket(
+      "ws://localhost:8000/ws/voice-stream-to-file"
+    );
+
     const recorder = new MediaRecorder(await audioContext.getAudioStream());
 
-    recorder.start(250);
+    // Wait for WebSocket to open before starting recording
+    socketRef.current.onopen = () => {
+      recorder.start(250);
+      setRecorder(recorder);
+    };
 
-    setRecorder(recorder);
+    // Optional: handle WebSocket errors
+    socketRef.current.onerror = (err) => {
+      console.error("WebSocket error:", err);
+    };
 
     return recorder;
   };
@@ -28,6 +42,12 @@ const Recorder = () => {
 
     if (recorder.state !== "inactive") {
       recorder.stop();
+    }
+
+    // Close WebSocket connection
+    if (socketRef.current) {
+      socketRef.current.close();
+      socketRef.current = null;
     }
 
     setRecorder(null);
@@ -62,10 +82,17 @@ const Recorder = () => {
   useEffect(() => {
     if (recorder && state.isRecording) {
       recorder.ondataavailable = (e) => {
-        console.log(e.data);
+        if (
+          e.data &&
+          e.data.size > 0 &&
+          socketRef.current &&
+          socketRef.current.readyState === WebSocket.OPEN
+        ) {
+          socketRef.current.send(e.data);
+        }
       };
     }
-  }, [recorder]);
+  }, [recorder, state.isRecording]);
 
   // CONNECTION SWITCHER BETWEEN SOURCE AND ANALYSER
   useEffect(() => {
@@ -90,7 +117,11 @@ const Recorder = () => {
     setAnalyser(audioContext.getAudioAnalyser());
   };
 
-  // SET INIT VALUE FOR ANALYSER IN THE COMPONENT MOUNT
+  /* 
+    SET INIT VALUES FOR: 
+      1.ANALYSER
+      2.SOCKET
+  */
   useEffect(() => {
     const setupAnalyzer = async () => {
       setAnalyser(await audioContext.getAudioAnalyser());
