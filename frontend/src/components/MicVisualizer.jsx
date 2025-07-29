@@ -1,8 +1,7 @@
 import React, { useEffect, useRef } from "react";
 
-const MicVisualizer = ({ icon = null, analyser }) => {
+const MicVisualizer = ({ children, analyser }) => {
   const canvasRef = useRef(null);
-  const iconRef = useRef(null);
 
   useEffect(() => {
     if (!analyser) return;
@@ -43,21 +42,10 @@ const MicVisualizer = ({ icon = null, analyser }) => {
       ctx.arc(centerX, centerY, glowRadius, 0, Math.PI * 2);
       ctx.fillStyle = gradient;
       ctx.fill();
-
-      // Only draw fallback icon if no custom icon provided
-      if (!icon) {
-        ctx.fillStyle = "#fff";
-        ctx.beginPath();
-        ctx.fillRect(centerX - 5, centerY - 20, 10, 30);
-        ctx.beginPath();
-        ctx.arc(centerX, centerY - 20, 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillRect(centerX - 10, centerY + 10, 20, 2);
-      }
     };
 
     draw();
-  }, [icon, analyser]);
+  }, [analyser]);
 
   return (
     <div
@@ -76,20 +64,17 @@ const MicVisualizer = ({ icon = null, analyser }) => {
           height: "100%",
         }}
       />
-      {icon && (
-        <div
-          ref={iconRef}
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            zIndex: 2,
-          }}
-        >
-          {icon}
-        </div>
-      )}
+      <div
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          zIndex: 2,
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 };
