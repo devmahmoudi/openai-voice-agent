@@ -17,7 +17,7 @@ export const AudioProvider = ({ children }) => {
     return audioCtxRef.current;
   };
 
-  const getStream = async () => {
+  const getAudioStream = async () => {
     // Get microphone stream
     if (!streamRef.current)
       streamRef.current = await navigator.mediaDevices.getUserMedia({
@@ -31,29 +31,34 @@ export const AudioProvider = ({ children }) => {
     try {
       const context = getAudioContext();
 
-      const stream = await getStream();
+      const stream = await getAudioStream();
 
       return context.createMediaStreamSource(stream);
     } catch (error) {
       console.error("Error accessing microphone:", error);
 
-      return null
+      return null;
     }
   };
 
   const getAudioAnalyser = (fftSize = 64) => {
-    const context = getAudioContext()
+    const context = getAudioContext();
 
-    const analyser = context.createAnalyser()
+    const analyser = context.createAnalyser();
 
     analyser.fftSize = fftSize;
 
-    return analyser
+    return analyser;
   };
 
   return (
     <AudioContext.Provider
-      value={{ getAudioContext, getStream, getAudioSource, getAudioAnalyser }}
+      value={{
+        getAudioContext,
+        getAudioStream,
+        getAudioSource,
+        getAudioAnalyser,
+      }}
     >
       {children}
     </AudioContext.Provider>
