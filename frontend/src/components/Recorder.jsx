@@ -9,32 +9,42 @@ const Recorder = () => {
 
   const [analyser, setAnalyser] = useState(null);
 
-  useEffect(() => {
-    const setupAnalyzer = async () => {
-      const analyser = await audioContext.getAudioAnalyser();
+  const [source, setSource] = useState(null);
 
-      const source = await audioContext.getAudioSource();
+  const [recorder, setRecorder] = useState(null);
 
-      if (source) source.connect(analyser);
+  const startRecording = async () => {
+    const voiceSource = await audioContext.getAudioSource();
 
-      setAnalyser(analyser);
-    };
+    setSource(voiceSource);
 
-    setupAnalyzer();
-  }, []);
+    voiceSource.connect(analyser);
 
-  const startRecorder = useReducer(
+    const recorder = new MediaRecorder(await audioContext.getAudioStream());
+
+    recorder.start(250);
+
+    setRecorder(recorder);
+
+    return recorder;
+  };
+
+  const stopRecording = () => {};
+
+  const [state, dispatch] = useReducer(
     (state, action) => {
       switch (action) {
         case "start":
+          startRecording();
+
           return {
             isRecording: true,
-            mediaRecorder: null,
           };
         case "stop":
+          stopRecording();
+
           return {
             isRecording: false,
-            mediaRecorder: null,
           };
         default:
           return state;
@@ -42,13 +52,33 @@ const Recorder = () => {
     },
     {
       isRecording: false,
-      mediaRecorder: null,
     }
   );
 
+  useEffect(() => {
+    if (recorder && state.isRecording) {
+      recorder.ondataavailable = (e) => {
+        console.log(e.data);
+      };
+    }
+  }, [recorder]);
+
+  useEffect(() => {
+    const setupAnalyzer = async () => {
+      setAnalyser(await audioContext.getAudioAnalyser());
+    };
+
+    setupAnalyzer();
+  }, []);
+
   return (
     <MicVisualizer analyser={analyser}>
-      <Mic />
+      <Mic
+        className="cursor-pointer bg-red-500 p-3 box-content rounded-full"
+        onClick={() => {
+          dispatch(state.isRecording ? "stop" : "start");
+        }}
+      />
     </MicVisualizer>
   );
 };
