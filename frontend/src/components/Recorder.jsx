@@ -1,57 +1,76 @@
-import { useReducer, useRef } from "react";
+import {
+  useReducer,
+  useRef,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import MicVisualizer from "./MicVisualizer";
 import { Mic } from "lucide-react";
-import { useContext, useEffect, useState } from "react";
 import AudioContext from "../contexts/AudioContext";
 
-const Recorder = () => {
+const Recorder = ({ onRecordingComplete }) => {
   const audioContext = useContext(AudioContext);
-
   const [analyser, setAnalyser] = useState(null);
-
   const [recorder, setRecorder] = useState(null);
+  const audioChunksRef = useRef([]);
 
-  const socketRef = useRef();
-
-  const startRecording = async () => {
-    // Open WebSocket connection
-    socketRef.current = new WebSocket(
-      "ws://localhost:8000/ws/voice-stream-to-file"
-    );
-
-    const recorder = new MediaRecorder(await audioContext.getAudioStream());
-
-    // Wait for WebSocket to open before starting recording
-    socketRef.current.onopen = () => {
-      recorder.start(250);
-      setRecorder(recorder);
-    };
-
-    // Optional: handle WebSocket errors
-    socketRef.current.onerror = (err) => {
-      console.error("WebSocket error:", err);
-    };
-
-    return recorder;
-  };
-
-  const stopRecording = () => {
-    if (!recorder) return;
-
-    recorder.ondataavailable = null;
-
-    if (recorder.state !== "inactive") {
+  // Moved cleanup to component scope
+  const cleanup = useCallback(() => {
+    if (recorder && recorder.state !== "inactive") {
       recorder.stop();
+      recorder.stream?.getTracks()?.forEach((track) => track.stop());
     }
+    audioChunksRef.current = [];
+  }, [recorder]);
 
-    // Close WebSocket connection
-    if (socketRef.current) {
-      socketRef.current.close();
-      socketRef.current = null;
+  const startRecording = useCallback(async () => {
+    try {
+      cleanup(); // Clean any previous recording
+      audioChunksRef.current = [];
+      const stream = await audioContext.getAudioStream();
+      const newRecorder = new MediaRecorder(stream);
+
+      newRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      newRecorder.start(250);
+      setRecorder(newRecorder);
+      return newRecorder;
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      throw error;
     }
+  }, [audioContext, cleanup]);
 
-    setRecorder(null);
-  };
+  const stopRecording = useCallback(async () => {
+    if (!recorder) return null;
+
+    return new Promise((resolve) => {
+      const onStop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/wav",
+        });
+        cleanup();
+        resolve(audioBlob);
+      };
+
+      recorder.onstop = onStop;
+
+      if (recorder.state !== "inactive") {
+        recorder.stop();
+      }
+
+      // Cleanup the onstop handler after use
+      return () => {
+        recorder.onstop = null;
+      };
+    });
+  }, [recorder, cleanup]);
 
   // RECORDING STATE
   const [state, dispatch] = useReducer(
@@ -59,86 +78,86 @@ const Recorder = () => {
       switch (action) {
         case "start":
           startRecording();
-
-          return {
-            isRecording: true,
-          };
+          return { isRecording: true };
         case "stop":
-          stopRecording();
-
-          return {
-            isRecording: false,
-          };
+          stopRecording().then((audioBlob) => {
+            if (audioBlob) {
+              onRecordingComplete(audioBlob);
+            }
+          });
+          return { isRecording: false };
         default:
           return state;
       }
     },
-    {
-      isRecording: false,
-    }
+    { isRecording: false }
   );
 
-  // HANDLE RECORDER DATA
-  useEffect(() => {
-    if (recorder && state.isRecording) {
-      recorder.ondataavailable = (e) => {
-        if (
-          e.data &&
-          e.data.size > 0 &&
-          socketRef.current &&
-          socketRef.current.readyState === WebSocket.OPEN
-        ) {
-          socketRef.current.send(e.data);
-        }
-      };
+  // CONNECT AUDIO SOURCE TO ANALYSER
+  const connectSourceToAnalyser = useCallback(async () => {
+    if (!analyser) return;
+    try {
+      const voiceSource = await audioContext.getAudioSource();
+      voiceSource.connect(analyser);
+    } catch (error) {
+      console.error("Error connecting source to analyser:", error);
     }
-  }, [recorder, state.isRecording]);
+  }, [analyser, audioContext]);
 
-  // CONNECTION SWITCHER BETWEEN SOURCE AND ANALYSER
+  // DISCONNECT AUDIO SOURCE FROM ANALYSER
+  const disconnectSourceToAnalyser = useCallback(async () => {
+    if (!analyser) return;
+    try {
+      const voiceSource = await audioContext.getAudioSource();
+      voiceSource.disconnect(analyser);
+    } catch (error) {
+      console.error("Error disconnecting source from analyser:", error);
+    }
+  }, [analyser, audioContext]);
+
+  // TOGGLE AUDIO CONNECTION BASED ON RECORDING STATE
   useEffect(() => {
     if (state.isRecording) {
       connectSourceToAnalyser();
     } else {
       disconnectSourceToAnalyser();
     }
-  }, [state.isRecording]);
+  }, [state.isRecording, connectSourceToAnalyser, disconnectSourceToAnalyser]);
 
-  // CONNECT AUDIO SOURCE TO ANALYSER
-  const connectSourceToAnalyser = async () => {
-    const voiceSource = await audioContext.getAudioSource();
-
-    voiceSource.connect(analyser);
-  };
-
-  // DISCONNECT AUDIO SOURCE FROM ANALYSER
-  const disconnectSourceToAnalyser = async () => {
-    const voiceSource = await audioContext.getAudioSource();
-
-    setAnalyser(audioContext.getAudioAnalyser());
-  };
-
-  /* 
-    SET INIT VALUES FOR: 
-      1.ANALYSER
-      2.SOCKET
-  */
+  // INITIALIZE ANALYSER
   useEffect(() => {
     const setupAnalyzer = async () => {
-      setAnalyser(await audioContext.getAudioAnalyser());
+      try {
+        setAnalyser(await audioContext.getAudioAnalyser());
+      } catch (error) {
+        console.error("Error setting up analyser:", error);
+      }
     };
 
     setupAnalyzer();
-  }, []);
+  }, [audioContext]);
+
+  // CLEANUP ON UNMOUNT
+  useEffect(() => {
+    return () => {
+      cleanup();
+    };
+  }, [cleanup]);
 
   return (
-    <MicVisualizer analyser={analyser}>
-      <Mic
-        className="cursor-pointer bg-red-500 p-3 box-content rounded-full"
-        onClick={() => {
-          dispatch(state.isRecording ? "stop" : "start");
-        }}
-      />
-    </MicVisualizer>
+    <div className="recorder-container">
+      <MicVisualizer analyser={analyser}>
+        <Mic
+          className={`cursor-pointer p-3 box-content rounded-full ${
+            state.isRecording ? "bg-red-500 animate-pulse" : "bg-gray-500"
+          }`}
+          onClick={() => dispatch(state.isRecording ? "stop" : "start")}
+        />
+      </MicVisualizer>
+      <div className="text-sm mt-2 text-center">
+        {state.isRecording ? "Recording..." : "Click to record"}
+      </div>
+    </div>
   );
 };
 
