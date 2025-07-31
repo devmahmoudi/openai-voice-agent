@@ -1,6 +1,6 @@
 import { useState } from "react";
 import "./App.css";
-import Player from "./components/player";
+import Player from "./components/Player";
 import Recorder from "./components/Recorder";
 
 function App() {
