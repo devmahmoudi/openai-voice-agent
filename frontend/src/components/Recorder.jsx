@@ -19,16 +19,10 @@ const Recorder = ({ onRecordingComplete }) => {
 
   const recorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-  const socketRef = useRef(null);
   const voiceSourceRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const audioContextRef = useRef(null);
   const audioBufferRef = useRef(null);
-
-  const socketUrl = useMemo(
-    () => "ws://127.0.0.1:8000/ws/voice-stream-to-file",
-    []
-  );
 
   const cleanup = useCallback(() => {
     if (recorderRef.current?.state !== "inactive") {
@@ -42,36 +36,7 @@ const Recorder = ({ onRecordingComplete }) => {
     audioChunksRef.current = [];
     audioBufferRef.current = null;
 
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.close();
-    }
-    socketRef.current = null;
   }, []);
-
-  const initWebSocket = useCallback(() => {
-    try {
-      dispatch({ type: "SET_SOCKET_STATUS", payload: "connecting" });
-      socketRef.current = new WebSocket(socketUrl);
-
-      socketRef.current.onopen = () => {
-        console.log("WebSocket connection established");
-        dispatch({ type: "SET_SOCKET_STATUS", payload: "connected" });
-      };
-
-      socketRef.current.onclose = () => {
-        console.log("WebSocket connection closed");
-        dispatch({ type: "SET_SOCKET_STATUS", payload: "disconnected" });
-      };
-
-      socketRef.current.onerror = () => {
-        console.error("WebSocket connection error");
-        dispatch({ type: "SET_SOCKET_STATUS", payload: "error" });
-      };
-    } catch (error) {
-      console.error("WebSocket initialization error:", error);
-      dispatch({ type: "SET_SOCKET_STATUS", payload: "error" });
-    }
-  }, [socketUrl]);
 
   const convertToPCM16Wav = useCallback(async (blob) => {
     try {
@@ -157,14 +122,7 @@ const Recorder = ({ onRecordingComplete }) => {
         if (e.data.size > 0) {
           audioChunksRef.current.push(e.data);
 
-          if (socketRef.current?.readyState === WebSocket.OPEN) {
-            try {
-              const buffer = await e.data.arrayBuffer();
-              socketRef.current.send(buffer);
-            } catch (sendError) {
-              console.error("Error sending audio data:", sendError);
-            }
-          }
+          // handle data available event
         }
       };
 
@@ -250,20 +208,6 @@ const Recorder = ({ onRecordingComplete }) => {
     };
   }, [state.isRecording, handleAnalyserConnection]);
 
-  useEffect(() => {
-    initWebSocket();
-    return cleanup;
-  }, [initWebSocket, cleanup]);
-
-  const socketStatusMessage = useMemo(() => {
-    switch (state.socketStatus) {
-      case "connected":
-        return "Connected to server";
-      default:
-        return `Status: ${state.socketStatus}`;
-    }
-  }, [state.socketStatus]);
-
   return (
     <div className="recorder-container flex flex-col items-center">
       <MicVisualizer analyser={analyser}>
@@ -287,7 +231,6 @@ const Recorder = ({ onRecordingComplete }) => {
           state.socketStatus === "connected" ? "text-green-500" : "text-red-500"
         }`}
       >
-        {socketStatusMessage}
       </div>
     </div>
   );
