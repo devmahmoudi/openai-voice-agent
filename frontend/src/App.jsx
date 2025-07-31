@@ -7,6 +7,11 @@ function App() {
   const [key, setKey] = useState(0);
   const [recordedAudio, setRecordedAudio] = useState(null);
 
+  const handlePlaybackComplete = () => {
+    setRecordedAudio(null);
+    setKey((prev) => prev + 1);
+  };
+
   return (
     <div className="flex gap-4 p-4" key={key}>
       {!recordedAudio ? (
