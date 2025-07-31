@@ -12,7 +12,6 @@ const Player = ({ audioBlob, onPlaybackComplete, onNewRecording }) => {
   const sourceRef = useRef(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Initialize audio context and analyser
   useEffect(() => {
     try {
       audioContextRef.current = new (window.AudioContext ||
@@ -27,7 +26,6 @@ const Player = ({ audioBlob, onPlaybackComplete, onNewRecording }) => {
       audioRef.current.addEventListener("error", handleAudioError);
 
       return () => {
-        // Cleanup
         if (audioRef.current) {
           audioRef.current.pause();
           audioRef.current.removeEventListener("ended", handleAudioEnd);
@@ -46,7 +44,6 @@ const Player = ({ audioBlob, onPlaybackComplete, onNewRecording }) => {
     }
   }, []);
 
-  // Update audio source when blob changes and autoplay
   useEffect(() => {
     if (audioBlob && isInitialized) {
       const audioUrl = URL.createObjectURL(audioBlob);
@@ -88,25 +85,18 @@ const Player = ({ audioBlob, onPlaybackComplete, onNewRecording }) => {
     try {
       setIsLoading(true);
       setError(null);
-
-      // Ensure audio context is resumed
       if (audioContextRef.current.state === "suspended") {
         await audioContextRef.current.resume();
       }
 
-      // Clean up any existing source
       cleanupSource();
 
-      // Create new source node
       sourceRef.current = audioContextRef.current.createMediaElementSource(
         audioRef.current
       );
-
-      // Connect the nodes: source -> analyser -> destination
       sourceRef.current.connect(analyser);
       analyser.connect(audioContextRef.current.destination);
 
-      // Play the audio
       await audioRef.current.play();
       setIsPlaying(true);
       setIsLoading(false);

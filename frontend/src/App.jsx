@@ -9,7 +9,7 @@ function App() {
 
   const handlePlaybackComplete = () => {
     setRecordedAudio(null);
-    setKey((prev) => prev + 1); // Force remount
+    setKey((prev) => prev + 1);
   };
 
   return (
