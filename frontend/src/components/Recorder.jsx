@@ -1,237 +1,112 @@
-import {
-  useReducer,
-  useRef,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-  useMemo,
-} from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useVoiceAgent } from "../contexts/VoiceAgentContext";
 import MicVisualizer from "./MicVisualizer";
 import { Mic } from "lucide-react";
-import AudioContext from "../contexts/AudioContext";
-import { initialState, reducer } from "../utils/recording";
+import { getClientSecretKey } from "../service/api";
 
 const Recorder = ({ onRecordingComplete }) => {
-  const [state, dispatch] = useReducer(reducer, initialState);
-  const [analyser, setAnalyser] = useState(null);
-  const audioContext = useContext(AudioContext);
-
-  const recorderRef = useRef(null);
+  const { session, isConnected, connect } = useVoiceAgent();
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-  const voiceSourceRef = useRef(null);
-  const mediaStreamRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const audioBufferRef = useRef(null);
+  const [analyser, setAnalyser] = useState(null);
 
-  const cleanup = useCallback(() => {
-    if (recorderRef.current?.state !== "inactive") {
-      recorderRef.current?.stop();
-      recorderRef.current = null;
-    }
-
-    mediaStreamRef.current?.getTracks()?.forEach((track) => track.stop());
-    mediaStreamRef.current = null;
-
-    audioChunksRef.current = [];
-    audioBufferRef.current = null;
-
-  }, []);
-
-  const convertToPCM16Wav = useCallback(async (blob) => {
+  const initializeAgent = useCallback(async () => {
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext ||
-          window.webkitAudioContext)();
-      }
-      const arrayBuffer = await blob.arrayBuffer();
-      const audioBuffer = await audioContextRef.current.decodeAudioData(
-        arrayBuffer
+      const response = await getClientSecretKey(
+        "gpt-4o-realtime-preview-2025-06-03"
       );
-      audioBufferRef.current = audioBuffer;
-      const pcmData = audioBuffer.getChannelData(0);
-      const pcm16 = new Int16Array(pcmData.length);
-      for (let i = 0; i < pcmData.length; i++) {
-        pcm16[i] = Math.max(-32768, Math.min(32767, pcmData[i] * 32768));
+      if (response) {
+        await connect(response.data.key);
+        console.log(response, "response ..........");
       }
-      const wavHeader = createWavHeader({
-        sampleRate: audioBuffer.sampleRate,
-        length: pcm16.length,
-        numChannels: audioBuffer.numberOfChannels,
-        bitDepth: 16,
-      });
-      const wavData = new Uint8Array(wavHeader.length + pcm16.length * 2);
-      wavData.set(wavHeader, 0);
-      wavData.set(new Uint8Array(pcm16.buffer), wavHeader.length);
-
-      return new Blob([wavData], { type: "audio/wav" });
     } catch (error) {
-      console.error("Error converting to PCM16 WAV:", error);
-      throw error;
+      console.error("Failed to initialize agent:", error);
     }
-  }, []);
-
-  const createWavHeader = useCallback((options) => {
-    const { sampleRate, length, numChannels, bitDepth } = options;
-    const byteRate = (sampleRate * numChannels * bitDepth) / 8;
-    const blockAlign = (numChannels * bitDepth) / 8;
-    const dataSize = (length * numChannels * bitDepth) / 8;
-
-    const buffer = new ArrayBuffer(44);
-    const view = new DataView(buffer);
-
-    writeString(view, 0, "RIFF");
-    view.setUint32(4, 36 + dataSize, true);
-    writeString(view, 8, "WAVE");
-    writeString(view, 12, "fmt ");
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, numChannels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, byteRate, true);
-    view.setUint16(32, blockAlign, true);
-    view.setUint16(34, bitDepth, true);
-    writeString(view, 36, "data");
-    view.setUint32(40, dataSize, true);
-
-    return new Uint8Array(buffer);
-  }, []);
-
-  const writeString = (view, offset, string) => {
-    for (let i = 0; i < string.length; i++) {
-      view.setUint8(offset + i, string.charCodeAt(i));
-    }
-  };
+  }, [connect]);
 
   const startRecording = useCallback(async () => {
     try {
-      cleanup();
-      audioChunksRef.current = [];
+      if (!isConnected) await initializeAgent();
 
-      const stream = await audioContext.getAudioStream();
-      mediaStreamRef.current = stream;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream, {
+        mimeType: "audio/webm",
+      });
 
-      const options = { mimeType: "audio/webm;codecs=pcm" };
-      const recorder = new MediaRecorder(
-        stream,
-        MediaRecorder.isTypeSupported(options.mimeType) ? options : undefined
-      );
-      recorderRef.current = recorder;
+      // Setup audio analysis for visualization
+      const audioContext = new (window.AudioContext ||
+        window.webkitAudioContext)();
+      const analyser = audioContext.createAnalyser();
+      setAnalyser(analyser);
 
-      recorder.ondataavailable = async (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
 
-          // handle data available event
+      mediaRecorderRef.current.ondataavailable = async (event) => {
+        if (event.data.size > 0) {
+          const arrayBuffer = await event.data.arrayBuffer();
+          if (isConnected) {
+            try {
+              await session.sendAudio(arrayBuffer);
+            } catch (error) {
+              console.error("Error sending audio:", error);
+            }
+          }
         }
       };
 
-      recorder.start(250);
-      dispatch({ type: "START_RECORDING" });
+      mediaRecorderRef.current.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+        onRecordingComplete(audioBlob);
+        audioChunksRef.current = [];
+      };
+
+      mediaRecorderRef.current.start(100); // Send chunks every 100ms
+      setIsRecording(true);
     } catch (error) {
       console.error("Error starting recording:", error);
-      throw error;
     }
-  }, [audioContext, cleanup]);
+  }, [isConnected, initializeAgent, session, onRecordingComplete]);
 
-  const stopRecording = useCallback(async () => {
-    if (!recorderRef.current) return null;
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream
+        .getTracks()
+        .forEach((track) => track.stop());
+      setIsRecording(false);
+    }
+  }, [isRecording]);
 
-    return new Promise((resolve) => {
-      const onStop = async () => {
-        try {
-          const audioBlob = new Blob(audioChunksRef.current);
-          const pcm16Blob = await convertToPCM16Wav(audioBlob);
-          cleanup();
-          resolve(pcm16Blob);
-        } catch (error) {
-          console.error("Error processing audio:", error);
-          cleanup();
-          resolve(null);
-        }
-      };
-
-      recorderRef.current.onstop = onStop;
-      recorderRef.current.stop();
-      dispatch({ type: "STOP_RECORDING" });
-    });
-  }, [cleanup, convertToPCM16Wav]);
-
-  const toggleRecording = useCallback(async () => {
-    if (state.isRecording) {
-      const audioBlob = await stopRecording();
-      if (audioBlob) {
-        onRecordingComplete(audioBlob);
-      }
+  const toggleRecording = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
     } else {
-      await startRecording();
+      startRecording();
     }
-  }, [state.isRecording, startRecording, stopRecording, onRecordingComplete]);
-
-  const handleAnalyserConnection = useCallback(
-    async (shouldConnect) => {
-      if (!analyser) return;
-
-      try {
-        if (shouldConnect) {
-          voiceSourceRef.current = await audioContext.getAudioSource();
-          voiceSourceRef.current.connect(analyser);
-        } else if (voiceSourceRef.current) {
-          voiceSourceRef.current.disconnect(analyser);
-        }
-      } catch (error) {
-        console.error("Error handling analyser connection:", error);
-      }
-    },
-    [analyser, audioContext]
-  );
-
-  useEffect(() => {
-    const setupAnalyzer = async () => {
-      try {
-        setAnalyser(await audioContext.getAudioAnalyser());
-      } catch (error) {
-        console.error("Error setting up analyser:", error);
-      }
-    };
-
-    setupAnalyzer();
-  }, [audioContext]);
-
-  useEffect(() => {
-    handleAnalyserConnection(state.isRecording);
-
-    return () => {
-      if (state.isRecording) {
-        handleAnalyserConnection(false);
-      }
-    };
-  }, [state.isRecording, handleAnalyserConnection]);
+  }, [isRecording, startRecording, stopRecording]);
 
   return (
-    <div className="recorder-container flex flex-col items-center">
+    <div className="flex flex-col items-center gap-4">
       <MicVisualizer analyser={analyser}>
-        <Mic
-          className={`cursor-pointer p-3 box-content rounded-full ${
-            state.isRecording
-              ? "bg-red-500 animate-pulse"
-              : "bg-gray-500 hover:bg-gray-400"
-          } transition-colors`}
+        <button
           onClick={toggleRecording}
-          size={24}
-        />
+          className={`w-16 h-16 rounded-full flex items-center justify-center ${
+            isRecording ? "bg-red-500 animate-pulse" : "bg-blue-500"
+          } text-white`}
+        >
+          <Mic size={24} />
+        </button>
       </MicVisualizer>
-
-      <div className="text-sm mt-2 text-center">
-        {state.isRecording ? "Recording..." : "Click to record"}
-      </div>
-
-      <div
-        className={`text-xs mt-1 text-center ${
-          state.socketStatus === "connected" ? "text-green-500" : "text-red-500"
-        }`}
-      >
-      </div>
+      <p className="text-sm text-gray-600">
+        {isRecording ? "Recording..." : "Tap to speak"}
+      </p>
+      {!isConnected && (
+        <p className="text-xs text-yellow-600">Connecting to agent...</p>
+      )}
     </div>
   );
 };
