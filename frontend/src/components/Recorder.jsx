@@ -13,12 +13,13 @@ const Recorder = ({ onRecordingComplete }) => {
 
   const initializeAgent = useCallback(async () => {
     try {
+      console.log("Initializing agent...");
       const response = await getClientSecretKey(
         "gpt-4o-realtime-preview-2025-06-03"
       );
       if (response) {
-        await connect(response.data.key);
-        console.log(response, "response ..........");
+        console.log("Agent initialized with key:", response.data.value);
+        await connect(response.data.value);
       }
     } catch (error) {
       console.error("Failed to initialize agent:", error);
@@ -27,14 +28,16 @@ const Recorder = ({ onRecordingComplete }) => {
 
   const startRecording = useCallback(async () => {
     try {
+      console.log("Starting recording...");
       if (!isConnected) await initializeAgent();
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log("Audio stream obtained:", stream);
+
       mediaRecorderRef.current = new MediaRecorder(stream, {
         mimeType: "audio/webm",
       });
 
-      // Setup audio analysis for visualization
       const audioContext = new (window.AudioContext ||
         window.webkitAudioContext)();
       const analyser = audioContext.createAnalyser();
@@ -48,6 +51,7 @@ const Recorder = ({ onRecordingComplete }) => {
           const arrayBuffer = await event.data.arrayBuffer();
           if (isConnected) {
             try {
+              console.log("Sending audio data...");
               await session.sendAudio(arrayBuffer);
             } catch (error) {
               console.error("Error sending audio:", error);
@@ -57,6 +61,7 @@ const Recorder = ({ onRecordingComplete }) => {
       };
 
       mediaRecorderRef.current.onstop = () => {
+        console.log("Recording stopped.");
         const audioBlob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
         });
