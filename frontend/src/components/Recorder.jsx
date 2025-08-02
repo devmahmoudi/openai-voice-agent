@@ -10,6 +10,8 @@ const Recorder = ({ onRecordingStart, onRecordingStop }) => {
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const [analyser, setAnalyser] = useState(null);
+  console.log("connect : ", isConnected);
+  console.log("session :", session);
 
   const initializeAgent = useCallback(async () => {
     try {
