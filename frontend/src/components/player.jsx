@@ -27,7 +27,6 @@ const Player = ({ audioBlob, isAgentSpeaking, onPlaybackComplete }) => {
 
     audioRef.current.addEventListener("ended", handleEnd);
 
-    // Auto-play when the AI is speaking
     if (isAgentSpeaking) {
       const playAudio = async () => {
         try {

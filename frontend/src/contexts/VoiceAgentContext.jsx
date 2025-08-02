@@ -14,7 +14,7 @@ export function VoiceAgentProvider({ children }) {
     const agent = new RealtimeAgent({
       name: "Voice Assistant",
       instructions:
-        "You are a helpful voice assistant. Respond conversationally.",
+        "شما دستیار هوش مصنوعی شرکت ساتیا ارائه دهنده خدمات و سرویس اینترنتی هستید.به محض اینکه کاربر سلام کرد خودتو معرفی کن بگو که از شرکت ساتیا هستی و ... و بعد بگو چه کمکی می تونم به شما بکنم ؟. ",
     });
 
     const newSession = new RealtimeSession(agent);
