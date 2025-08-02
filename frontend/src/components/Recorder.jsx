@@ -1,26 +1,21 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useVoiceAgent } from "../contexts/VoiceAgentContext";
+import { useCallback, useEffect, useRef, useState } from "react";
 import MicVisualizer from "./MicVisualizer";
 import { Mic } from "lucide-react";
 import { getClientSecretKey } from "../service/api";
+import { useVoiceAgent } from "../contexts/VoiceAgentContext";
 
-const Recorder = ({ onRecordingComplete }) => {
-  const { session, isConnected, connect } = useVoiceAgent();
+const Recorder = () => {
+  const { session, isConnected, connect, setIsAgentSpeaking } = useVoiceAgent();
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
   const [analyser, setAnalyser] = useState(null);
 
   const initializeAgent = useCallback(async () => {
     try {
-      console.log("Initializing agent...");
       const response = await getClientSecretKey(
         "gpt-4o-realtime-preview-2025-06-03"
       );
-      if (response) {
-        console.log("Agent initialized with key:", response.data.value);
-        await connect(response.data.value);
-      }
+      await connect(response.data.value);
     } catch (error) {
       console.error("Failed to initialize agent:", error);
     }
@@ -28,16 +23,15 @@ const Recorder = ({ onRecordingComplete }) => {
 
   const startRecording = useCallback(async () => {
     try {
-      console.log("Starting recording...");
       if (!isConnected) await initializeAgent();
+      setIsAgentSpeaking(false);
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      console.log("Audio stream obtained:", stream);
-
       mediaRecorderRef.current = new MediaRecorder(stream, {
         mimeType: "audio/webm",
       });
 
+      // Audio visualization setup
       const audioContext = new (window.AudioContext ||
         window.webkitAudioContext)();
       const analyser = audioContext.createAnalyser();
@@ -48,33 +42,21 @@ const Recorder = ({ onRecordingComplete }) => {
 
       mediaRecorderRef.current.ondataavailable = async (event) => {
         if (event.data.size > 0) {
-          const arrayBuffer = await event.data.arrayBuffer();
-          if (isConnected) {
-            try {
-              console.log("Sending audio data...");
-              await session.sendAudio(arrayBuffer);
-            } catch (error) {
-              console.error("Error sending audio:", error);
-            }
+          try {
+            const arrayBuffer = await event.data.arrayBuffer();
+            await session.sendAudio(arrayBuffer);
+          } catch (error) {
+            console.error("Error sending audio:", error);
           }
         }
       };
 
-      mediaRecorderRef.current.onstop = () => {
-        console.log("Recording stopped.");
-        const audioBlob = new Blob(audioChunksRef.current, {
-          type: "audio/webm",
-        });
-        onRecordingComplete(audioBlob);
-        audioChunksRef.current = [];
-      };
-
-      mediaRecorderRef.current.start(100); // Send chunks every 100ms
+      mediaRecorderRef.current.start(100); // 100ms chunks
       setIsRecording(true);
     } catch (error) {
       console.error("Error starting recording:", error);
     }
-  }, [isConnected, initializeAgent, session, onRecordingComplete]);
+  }, [isConnected, initializeAgent, session, setIsAgentSpeaking]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
@@ -86,19 +68,17 @@ const Recorder = ({ onRecordingComplete }) => {
     }
   }, [isRecording]);
 
-  const toggleRecording = useCallback(() => {
-    if (isRecording) {
+  useEffect(() => {
+    return () => {
       stopRecording();
-    } else {
-      startRecording();
-    }
-  }, [isRecording, startRecording, stopRecording]);
+    };
+  }, [stopRecording]);
 
   return (
     <div className="flex flex-col items-center gap-4">
       <MicVisualizer analyser={analyser}>
         <button
-          onClick={toggleRecording}
+          onClick={isRecording ? stopRecording : startRecording}
           className={`w-16 h-16 rounded-full flex items-center justify-center ${
             isRecording ? "bg-red-500 animate-pulse" : "bg-blue-500"
           } text-white`}
@@ -107,11 +87,8 @@ const Recorder = ({ onRecordingComplete }) => {
         </button>
       </MicVisualizer>
       <p className="text-sm text-gray-600">
-        {isRecording ? "Recording..." : "Tap to speak"}
+        {isRecording ? "Speak now..." : "Tap to speak"}
       </p>
-      {!isConnected && (
-        <p className="text-xs text-yellow-600">Connecting to agent...</p>
-      )}
     </div>
   );
 };

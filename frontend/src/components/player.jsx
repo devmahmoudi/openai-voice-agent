@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from "react";
-import { useVoiceAgent } from "../contexts/VoiceAgentContext";
+import { useEffect, useRef, useState } from "react";
 import MicVisualizer from "./MicVisualizer";
 import { Volume2 } from "lucide-react";
+import { useVoiceAgent } from "../contexts/VoiceAgentContext";
 
 const Player = ({ audioBlob, onPlaybackComplete }) => {
-  const { session } = useVoiceAgent();
+  const { isAgentSpeaking } = useVoiceAgent();
   const audioRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [analyser, setAnalyser] = useState(null);
@@ -22,18 +22,31 @@ const Player = ({ audioBlob, onPlaybackComplete }) => {
     source.connect(analyser);
     analyser.connect(audioContext.destination);
 
-    audioRef.current.onended = () => {
+    const handleEnd = () => {
       setIsPlaying(false);
       onPlaybackComplete();
     };
 
+    audioRef.current.addEventListener("ended", handleEnd);
+
+    // Auto-play when agent is speaking
+    if (isAgentSpeaking) {
+      const playAudio = async () => {
+        try {
+          await audioRef.current.play();
+          setIsPlaying(true);
+        } catch (error) {
+          console.error("Error playing audio:", error);
+        }
+      };
+      playAudio();
+    }
+
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
+      audioRef.current?.removeEventListener("ended", handleEnd);
+      audioRef.current?.pause();
     };
-  }, [audioBlob, onPlaybackComplete]);
+  }, [audioBlob, isAgentSpeaking, onPlaybackComplete]);
 
   const togglePlayback = () => {
     if (isPlaying) {
@@ -58,7 +71,11 @@ const Player = ({ audioBlob, onPlaybackComplete }) => {
         </button>
       </MicVisualizer>
       <p className="text-sm text-gray-600">
-        {isPlaying ? "Playing..." : "Tap to play"}
+        {isAgentSpeaking
+          ? "AI is speaking..."
+          : isPlaying
+          ? "Playing..."
+          : "Tap to play"}
       </p>
     </div>
   );

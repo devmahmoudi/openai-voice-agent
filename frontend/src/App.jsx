@@ -1,32 +1,47 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
 import Recorder from "./components/Recorder";
+import {
+  VoiceAgentProvider,
+  useVoiceAgent,
+} from "./contexts/VoiceAgentContext";
 import Player from "./components/player";
-import { VoiceAgentProvider } from "./contexts/VoiceAgentContext";
 
 function App() {
-  const [key, setKey] = useState(0);
-  const [recordedAudio, setRecordedAudio] = useState(null);
+  return (
+    <VoiceAgentProvider>
+      <VoiceInterface />
+    </VoiceAgentProvider>
+  );
+}
+
+function VoiceInterface() {
+  const { isAgentSpeaking, audioQueue, clearAudioQueue } = useVoiceAgent();
+  const [currentAudio, setCurrentAudio] = useState(null);
+
+  useEffect(() => {
+    if (audioQueue.length > 0 && !currentAudio) {
+      const audioBlob = new Blob([audioQueue[0]], { type: "audio/mp3" });
+      setCurrentAudio(audioBlob);
+      clearAudioQueue();
+    }
+  }, [audioQueue, currentAudio]);
+
   const handlePlaybackComplete = () => {
-    setRecordedAudio(null);
-    setKey((prev) => prev + 1);
+    setCurrentAudio(null);
   };
 
   return (
-    <VoiceAgentProvider>
-      <div className="flex gap-4 p-4" key={key}>
-        {!recordedAudio ? (
-          <Recorder
-            onRecordingComplete={(audioBlob) => setRecordedAudio(audioBlob)}
-          />
-        ) : (
-          <Player
-            audioBlob={recordedAudio}
-            onPlaybackComplete={handlePlaybackComplete}
-          />
-        )}
-      </div>
-    </VoiceAgentProvider>
+    <div className="flex gap-4 p-4">
+      {isAgentSpeaking || currentAudio ? (
+        <Player
+          audioBlob={currentAudio}
+          onPlaybackComplete={handlePlaybackComplete}
+        />
+      ) : (
+        <Recorder />
+      )}
+    </div>
   );
 }
 
