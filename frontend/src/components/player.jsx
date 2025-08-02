@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import MicVisualizer from "./MicVisualizer";
 import { Volume2 } from "lucide-react";
-import { useVoiceAgent } from "../contexts/VoiceAgentContext";
 
-const Player = ({ audioBlob, onPlaybackComplete }) => {
-  const { isAgentSpeaking } = useVoiceAgent();
+const Player = ({ audioBlob, isAgentSpeaking, onPlaybackComplete }) => {
   const audioRef = useRef(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [analyser, setAnalyser] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     if (!audioBlob) return;
@@ -29,7 +27,7 @@ const Player = ({ audioBlob, onPlaybackComplete }) => {
 
     audioRef.current.addEventListener("ended", handleEnd);
 
-    // Auto-play when agent is speaking
+    // Auto-play when the AI is speaking
     if (isAgentSpeaking) {
       const playAudio = async () => {
         try {
@@ -45,6 +43,7 @@ const Player = ({ audioBlob, onPlaybackComplete }) => {
     return () => {
       audioRef.current?.removeEventListener("ended", handleEnd);
       audioRef.current?.pause();
+      audioContext.close();
     };
   }, [audioBlob, isAgentSpeaking, onPlaybackComplete]);
 

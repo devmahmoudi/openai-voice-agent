@@ -10,7 +10,6 @@ export function VoiceAgentProvider({ children }) {
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
   const [audioQueue, setAudioQueue] = useState([]);
 
-  // Initialize session and agent
   useEffect(() => {
     const agent = new RealtimeAgent({
       name: "Voice Assistant",
@@ -20,7 +19,6 @@ export function VoiceAgentProvider({ children }) {
 
     const newSession = new RealtimeSession(agent);
 
-    // Set up audio event listener
     newSession.on("audio", (event) => {
       setIsAgentSpeaking(true);
       setAudioQueue((prev) => [...prev, event.audioData]);

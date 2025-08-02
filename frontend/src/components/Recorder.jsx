@@ -4,8 +4,8 @@ import { Mic } from "lucide-react";
 import { getClientSecretKey } from "../service/api";
 import { useVoiceAgent } from "../contexts/VoiceAgentContext";
 
-const Recorder = () => {
-  const { session, isConnected, connect, setIsAgentSpeaking } = useVoiceAgent();
+const Recorder = ({ onRecordingStart, onRecordingStop }) => {
+  const { session, isConnected, connect } = useVoiceAgent();
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const [analyser, setAnalyser] = useState(null);
@@ -24,14 +24,12 @@ const Recorder = () => {
   const startRecording = useCallback(async () => {
     try {
       if (!isConnected) await initializeAgent();
-      setIsAgentSpeaking(false);
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream, {
         mimeType: "audio/webm",
       });
 
-      // Audio visualization setup
       const audioContext = new (window.AudioContext ||
         window.webkitAudioContext)();
       const analyser = audioContext.createAnalyser();
@@ -51,12 +49,13 @@ const Recorder = () => {
         }
       };
 
-      mediaRecorderRef.current.start(100); // 100ms chunks
+      mediaRecorderRef.current.start(100);
       setIsRecording(true);
+      onRecordingStart?.();
     } catch (error) {
       console.error("Error starting recording:", error);
     }
-  }, [isConnected, initializeAgent, session, setIsAgentSpeaking]);
+  }, [isConnected, initializeAgent, session, onRecordingStart]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
@@ -65,8 +64,9 @@ const Recorder = () => {
         .getTracks()
         .forEach((track) => track.stop());
       setIsRecording(false);
+      onRecordingStop?.();
     }
-  }, [isRecording]);
+  }, [isRecording, onRecordingStop]);
 
   useEffect(() => {
     return () => {
