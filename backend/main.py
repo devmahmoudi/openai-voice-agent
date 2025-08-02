@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware 
 from pydantic import BaseModel
 import httpx
 import os
@@ -9,6 +10,14 @@ load_dotenv()
 
 app = FastAPI()
 OPENAI_API_URL = "https://api.openai.com/v1/realtime/sessions"
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class OpenAIModel(str, Enum):
     GPT4_REALTIME = "gpt-4o-realtime-preview-2025-06-03"
