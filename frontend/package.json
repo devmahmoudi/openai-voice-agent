@@ -10,12 +10,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@openai/agents": "^0.0.14",
     "@tailwindcss/vite": "^4.1.11",
     "axios": "^1.11.0",
+    "install": "^0.13.0",
     "dotenv": "^17.2.1",
     "lucide-react": "^0.526.0",
+    "npm": "^11.5.2",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "zod": "<=3.25.67"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

@@ -1,148 +1,65 @@
-import { useRef, useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useVoiceAgent } from "../contexts/VoiceAgentContext";
 import MicVisualizer from "./MicVisualizer";
 import { Volume2 } from "lucide-react";
 
-const Player = ({ audioBlob, onPlaybackComplete, onNewRecording }) => {
-  const [analyser, setAnalyser] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+const Player = ({ audioBlob, onPlaybackComplete }) => {
+  const { session } = useVoiceAgent();
   const audioRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const sourceRef = useRef(null);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [analyser, setAnalyser] = useState(null);
 
   useEffect(() => {
-    try {
-      audioContextRef.current = new (window.AudioContext ||
-        window.webkitAudioContext)();
-      const newAnalyser = audioContextRef.current.createAnalyser();
-      setAnalyser(newAnalyser);
-      setIsInitialized(true);
+    if (!audioBlob) return;
 
-      audioRef.current = new Audio();
-      audioRef.current.preload = "auto";
-      audioRef.current.addEventListener("ended", handleAudioEnd);
-      audioRef.current.addEventListener("error", handleAudioError);
+    const audioContext = new (window.AudioContext ||
+      window.webkitAudioContext)();
+    const analyser = audioContext.createAnalyser();
+    setAnalyser(analyser);
 
-      return () => {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.removeEventListener("ended", handleAudioEnd);
-          audioRef.current.removeEventListener("error", handleAudioError);
-          audioRef.current.src = "";
-        }
-        if (sourceRef.current) {
-          sourceRef.current.disconnect();
-        }
-        if (audioContextRef.current) {
-          audioContextRef.current.close();
-        }
-      };
-    } catch (err) {
-      setError("Failed to initialize audio: " + err.message);
-    }
-  }, []);
+    audioRef.current = new Audio(URL.createObjectURL(audioBlob));
+    const source = audioContext.createMediaElementSource(audioRef.current);
+    source.connect(analyser);
+    analyser.connect(audioContext.destination);
 
-  useEffect(() => {
-    if (audioBlob && isInitialized) {
-      const audioUrl = URL.createObjectURL(audioBlob);
-      audioRef.current.src = audioUrl;
-      setError(null);
-      startPlaying();
-    }
-  }, [audioBlob, isInitialized]);
-
-  const handleAudioEnd = () => {
-    setIsPlaying(false);
-    cleanupSource();
-    onPlaybackComplete();
-  };
-
-  const handleAudioError = () => {
-    const errorMsg = audioRef.current.error
-      ? `Error ${audioRef.current.error.code}: ${audioRef.current.error.message}`
-      : "Unknown playback error";
-    setError(errorMsg);
-    setIsPlaying(false);
-    setIsLoading(false);
-    cleanupSource();
-  };
-
-  const cleanupSource = () => {
-    if (sourceRef.current) {
-      sourceRef.current.disconnect();
-      sourceRef.current = null;
-    }
-  };
-
-  const startPlaying = async () => {
-    if (!audioBlob || !analyser) {
-      setError("Audio not ready for playback");
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-      if (audioContextRef.current.state === "suspended") {
-        await audioContextRef.current.resume();
-      }
-
-      cleanupSource();
-
-      sourceRef.current = audioContextRef.current.createMediaElementSource(
-        audioRef.current
-      );
-      sourceRef.current.connect(analyser);
-      analyser.connect(audioContextRef.current.destination);
-
-      await audioRef.current.play();
-      setIsPlaying(true);
-      setIsLoading(false);
-    } catch (err) {
-      console.error("Playback error:", err);
-      setError("Playback failed: " + err.message);
+    audioRef.current.onended = () => {
       setIsPlaying(false);
-      setIsLoading(false);
-      cleanupSource();
-    }
-  };
+      onPlaybackComplete();
+    };
 
-  const stopPlaying = () => {
-    if (audioRef.current) {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [audioBlob, onPlaybackComplete]);
+
+  const togglePlayback = () => {
+    if (isPlaying) {
       audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
     }
-    setIsPlaying(false);
-    cleanupSource();
   };
 
   return (
-    <div className="player-container">
+    <div className="flex flex-col items-center gap-4">
       <MicVisualizer analyser={analyser}>
-        <Volume2
-          className={`cursor-pointer p-3 box-content rounded-full ${
-            isLoading
-              ? "bg-gray-500"
-              : isPlaying
-              ? "bg-green-500 animate-pulse"
-              : audioBlob
-              ? "bg-blue-500"
-              : "bg-gray-300"
-          }`}
-          onClick={() => {
-            if (isLoading || !audioBlob) return;
-            isPlaying ? stopPlaying() : startPlaying();
-          }}
-        />
+        <button
+          onClick={togglePlayback}
+          className={`w-16 h-16 rounded-full flex items-center justify-center ${
+            isPlaying ? "bg-green-500 animate-pulse" : "bg-blue-500"
+          } text-white`}
+        >
+          <Volume2 size={24} />
+        </button>
       </MicVisualizer>
-      <div className="text-sm mt-2 text-center">
-        {isLoading ? "Loading..." : isPlaying ? "Playing..." : "Audio ready"}
-      </div>
-      {error && (
-        <div className="text-red-500 text-sm mt-2 text-center">{error}</div>
-      )}
+      <p className="text-sm text-gray-600">
+        {isPlaying ? "Playing..." : "Tap to play"}
+      </p>
     </div>
   );
 };
