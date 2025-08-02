@@ -18,7 +18,6 @@ function App() {
 function VoiceInterface() {
   const { isAgentSpeaking, audioQueue, clearAudioQueue } = useVoiceAgent();
   const [currentAudio, setCurrentAudio] = useState(null);
-  const [isUserRecording, setIsUserRecording] = useState(false);
 
   useEffect(() => {
     if (audioQueue.length > 0 && !currentAudio) {
@@ -34,22 +33,14 @@ function VoiceInterface() {
 
   return (
     <div className="flex gap-4 p-4">
-      {isUserRecording ? (
-        <Recorder
-          onRecordingStart={() => setIsUserRecording(true)}
-          onRecordingStop={() => setIsUserRecording(false)}
-        />
-      ) : currentAudio || isAgentSpeaking ? (
+      {currentAudio || isAgentSpeaking ? (
         <Player
           audioBlob={currentAudio}
           isAgentSpeaking={isAgentSpeaking}
           onPlaybackComplete={handlePlaybackComplete}
         />
       ) : (
-        <Recorder
-          onRecordingStart={() => setIsUserRecording(true)}
-          onRecordingStop={() => setIsUserRecording(false)}
-        />
+        <Recorder />
       )}
     </div>
   );

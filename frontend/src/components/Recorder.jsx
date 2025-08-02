@@ -3,6 +3,7 @@ import MicVisualizer from "./MicVisualizer";
 import { Mic } from "lucide-react";
 import { getClientSecretKey } from "../service/api";
 import { useVoiceAgent } from "../contexts/VoiceAgentContext";
+import Player from "./Player";
 
 const Recorder = ({ onRecordingStart, onRecordingStop }) => {
   const { session, isConnected, connect } = useVoiceAgent();
