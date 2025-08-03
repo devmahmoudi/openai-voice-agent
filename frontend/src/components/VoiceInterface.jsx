@@ -127,28 +127,15 @@ function VoiceInterface() {
   return (
     <div className="flex flex-col items-center gap-4 p-4">
       <MicVisualizer analyser={analyserRef.current}>
-        {mode === "playing" ? (
-          <button className="w-16 h-16 rounded-full bg-green-500 animate-pulse flex items-center justify-center text-white">
-            <Volume2 size={24} />
-          </button>
-        ) : (
-          <button
-            onClick={toggleRecording}
-            className={`w-16 h-16 rounded-full flex items-center justify-center ${
-              mode === "recording" ? "bg-red-500 animate-pulse" : "bg-blue-500"
-            } text-white`}
-          >
-            <Mic size={24} />
-          </button>
-        )}
+        <button
+          onClick={toggleRecording}
+          className={`w-16 h-16 rounded-full flex items-center justify-center 
+          
+           text-white`}
+        >
+          <Mic size={24} />
+        </button>
       </MicVisualizer>
-
-      <p className="text-sm text-gray-600">
-        {mode === "ready" && "برای صحبت کلیک کنید"}
-        {mode === "recording" && "در حال ضبط صدا..."}
-        {mode === "processing" && "در حال پردازش..."}
-        {mode === "playing" && "در حال پخش پاسخ..."}
-      </p>
     </div>
   );
 }
