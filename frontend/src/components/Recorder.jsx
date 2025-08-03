@@ -1,10 +1,10 @@
-import { Mic } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useVoiceAgent } from "../contexts/VoiceAgentContext";
 import { getClientSecretKey } from "../service/api";
 import MicVisualizer from "./MicVisualizer";
+import { Mic } from "lucide-react";
 
-const Recorder = ({ onRecordingStart, onRecordingStop }) => {
+const Recorder = () => {
   const { session, isConnected, connect } = useVoiceAgent();
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
@@ -51,11 +51,10 @@ const Recorder = ({ onRecordingStart, onRecordingStop }) => {
 
       mediaRecorderRef.current.start(100);
       setIsRecording(true);
-      onRecordingStart?.();
     } catch (error) {
       console.error("Error starting recording:", error);
     }
-  }, [isConnected, initializeAgent, session, onRecordingStart]);
+  }, [isConnected, initializeAgent, session]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
@@ -64,9 +63,8 @@ const Recorder = ({ onRecordingStart, onRecordingStop }) => {
         .getTracks()
         .forEach((track) => track.stop());
       setIsRecording(false);
-      onRecordingStop?.();
     }
-  }, [isRecording, onRecordingStop]);
+  }, [isRecording]);
 
   useEffect(() => {
     return () => {
@@ -87,7 +85,7 @@ const Recorder = ({ onRecordingStart, onRecordingStop }) => {
         </button>
       </MicVisualizer>
       <p className="text-sm text-gray-600">
-        {isRecording ? "Speak now..." : "Tap to speak"}
+        {isRecording ? "در حال صحبت..." : "برای صحبت کلیک کنید"}
       </p>
     </div>
   );

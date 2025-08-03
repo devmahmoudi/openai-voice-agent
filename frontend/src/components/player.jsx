@@ -5,7 +5,6 @@ import { Volume2 } from "lucide-react";
 const Player = ({ audioBlob, isAgentSpeaking, onPlaybackComplete }) => {
   const audioRef = useRef(null);
   const [analyser, setAnalyser] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     if (!audioBlob) return;
@@ -21,59 +20,31 @@ const Player = ({ audioBlob, isAgentSpeaking, onPlaybackComplete }) => {
     analyser.connect(audioContext.destination);
 
     const handleEnd = () => {
-      setIsPlaying(false);
       onPlaybackComplete();
     };
 
     audioRef.current.addEventListener("ended", handleEnd);
 
-    if (isAgentSpeaking) {
-      const playAudio = async () => {
-        try {
-          await audioRef.current.play();
-          setIsPlaying(true);
-        } catch (error) {
-          console.error("Error playing audio:", error);
-        }
-      };
-      playAudio();
-    }
+    audioRef.current.play().catch((error) => {
+      console.error("Playback failed:", error);
+    });
 
     return () => {
       audioRef.current?.removeEventListener("ended", handleEnd);
       audioRef.current?.pause();
       audioContext.close();
     };
-  }, [audioBlob, isAgentSpeaking, onPlaybackComplete]);
-
-  const togglePlayback = () => {
-    if (isPlaying) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-    } else {
-      audioRef.current.play();
-      setIsPlaying(true);
-    }
-  };
+  }, [audioBlob, onPlaybackComplete]);
 
   return (
     <div className="flex flex-col items-center gap-4">
       <MicVisualizer analyser={analyser}>
-        <button
-          onClick={togglePlayback}
-          className={`w-16 h-16 rounded-full flex items-center justify-center ${
-            isPlaying ? "bg-green-500 animate-pulse" : "bg-blue-500"
-          } text-white`}
-        >
+        <button className="w-16 h-16 rounded-full flex items-center justify-center bg-green-500 animate-pulse text-white">
           <Volume2 size={24} />
         </button>
       </MicVisualizer>
       <p className="text-sm text-gray-600">
-        {isAgentSpeaking
-          ? "AI is speaking..."
-          : isPlaying
-          ? "Playing..."
-          : "Tap to play"}
+        {isAgentSpeaking ? "AI is speaking..." : "Playing response..."}
       </p>
     </div>
   );
