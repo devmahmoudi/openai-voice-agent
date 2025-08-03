@@ -42,7 +42,6 @@ export function VoiceAgentProvider({ children }) {
       if (!session) throw new Error("Session not initialized");
       await session.connect({ apiKey });
       setIsConnected(true);
-      // setIsAgentSpeaking(true);
     } catch (err) {
       setError(err);
       throw err;
