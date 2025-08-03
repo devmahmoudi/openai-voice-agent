@@ -1,17 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import MicVisualizer from "./MicVisualizer";
 import { Mic } from "lucide-react";
-import { getClientSecretKey } from "../service/api";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useVoiceAgent } from "../contexts/VoiceAgentContext";
-import Player from "./Player";
+import { getClientSecretKey } from "../service/api";
+import MicVisualizer from "./MicVisualizer";
 
 const Recorder = ({ onRecordingStart, onRecordingStop }) => {
   const { session, isConnected, connect } = useVoiceAgent();
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef(null);
   const [analyser, setAnalyser] = useState(null);
-  console.log("connect : ", isConnected);
-  console.log("session :", session);
 
   const initializeAgent = useCallback(async () => {
     try {

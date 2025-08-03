@@ -9,7 +9,6 @@ export function VoiceAgentProvider({ children }) {
   const [error, setError] = useState(null);
   const [isAgentSpeaking, setIsAgentSpeaking] = useState(false);
   const [audioQueue, setAudioQueue] = useState([]);
-  console.log("status : ", isAgentSpeaking);
 
   useEffect(() => {
     const agent = new RealtimeAgent({
@@ -43,7 +42,7 @@ export function VoiceAgentProvider({ children }) {
       if (!session) throw new Error("Session not initialized");
       await session.connect({ apiKey });
       setIsConnected(true);
-      setIsAgentSpeaking(true);
+      // setIsAgentSpeaking(true);
     } catch (err) {
       setError(err);
       throw err;

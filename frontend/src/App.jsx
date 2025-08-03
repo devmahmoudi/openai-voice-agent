@@ -40,7 +40,7 @@ function VoiceInterface() {
           onPlaybackComplete={handlePlaybackComplete}
         />
       ) : (
-        <Recorder />
+        <Recorder/>
       )}
     </div>
   );
