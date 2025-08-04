@@ -1,39 +1,54 @@
-# main.py
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from datetime import datetime
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware 
+from pydantic import BaseModel
+import httpx
 import os
+from dotenv import load_dotenv
+from enum import Enum
+
+load_dotenv()
 
 app = FastAPI()
+OPENAI_API_URL = "https://api.openai.com/v1/realtime/sessions"
 
-@app.websocket("/ws/voice-stream-to-file")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    
-    # Create filename with current datetime
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"voice_recording_{timestamp}.wav"
-    
-    # Ensure recordings directory exists
-    recordings_dir = "recordings"
-    os.makedirs(recordings_dir, exist_ok=True)
-    filepath = os.path.join(recordings_dir, filename)
-    
-    print(f"Starting voice recording: {filepath}")
-    
-    try:
-        with open(filepath, "wb") as audio_file:
-            while True:
-                # Receive binary data (voice buffer bytes)
-                data = await websocket.receive_bytes()
-                audio_file.write(data)
-                audio_file.flush()  # Ensure data is written immediately
-                
-                # Send acknowledgment back to client
-                await websocket.send_text(f"Received {len(data)} bytes")
-                
-    except WebSocketDisconnect:
-        print(f"Client disconnected. Recording saved to: {filepath}")
-    except Exception as e:
-        print(f"Error during recording: {e}")
-        if os.path.exists(filepath):
-            os.remove(filepath)  # Clean up incomplete file
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class OpenAIModel(str, Enum):
+    GPT4_REALTIME = "gpt-4o-realtime-preview-2025-06-03"
+
+# Use query parameters instead of a body for GET
+@app.get("/v1/agent/client_key")
+async def get_client_key(model: OpenAIModel = OpenAIModel.GPT4_REALTIME):
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            # Forward model as a query param to OpenAI
+            response = await client.post(
+                OPENAI_API_URL,
+                headers=headers,
+                json={"model": model.value}
+            )
+            response.raise_for_status()
+            data = response.json()
+            if 'client_secret' not in data:
+                raise HTTPException(status_code=500, detail="OpenAI response missing client_secret")
+            return data['client_secret']
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(
+                status_code=e.response.status_code,
+                detail=e.response.json()
+            )
